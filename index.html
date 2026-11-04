@@ -55,6 +55,10 @@
                             Iniciar Sesión
                         </button>
                     </form>
+
+                    <div class="mt-6 pt-4 border-t border-slate-100 text-center">
+                        <p class="text-[11px] text-slate-400">Acceso maestro Diseñador: usuario <span class="font-semibold text-slate-600">diseñador</span> / clave <span class="font-semibold text-slate-600">Hjs2154</span></p>
+                    </div>
                 </div>
             </div>
         </template>
@@ -74,14 +78,6 @@
                     </div>
                 </div>
                 <div class="flex items-center space-x-2 sm:space-x-3">
-                    <!-- Indicador de estado de conexión Firebase (Sólo un botón de color) -->
-                    <div class="p-2.5 rounded-xl bg-white/10 flex items-center justify-center">
-                        <span class="relative flex h-3 w-3">
-                            <span x-show="isConnected" class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                            <span class="relative inline-flex rounded-full h-3 w-3" :class="isConnected ? 'bg-emerald-500' : 'bg-rose-500'"></span>
-                        </span>
-                    </div>
-
                     <!-- Botón Configuración de Pago (Diseñador o Administrador) -->
                     <template x-if="currentUser?.role === 'diseñador' || currentUser?.role === 'Administrador'">
                         <button @click="openPaymentConfigModal()" class="bg-indigo-700 hover:bg-indigo-800 text-white px-3 sm:px-4 py-2 rounded-xl text-sm font-medium shadow-sm transition flex items-center space-x-2" title="Configurar Alias y WhatsApp de pagos">
@@ -566,16 +562,20 @@
                     <input type="date" x-model="whatsappStartDate" @change="updateWhatsappMessage()" class="px-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500">
                 </div>
 
-                <p class="text-xs text-slate-500 mb-2">Vista previa del mensaje que recibirá el cliente (con el alias listo para copiar y transferir fácilmente):</p>
+                <p class="text-xs text-slate-500 mb-2">Puedes revisar y personalizar el mensaje antes de enviarlo directamente por WhatsApp al cliente.</p>
                 
                 <!-- Área de texto del mensaje -->
                 <div class="relative mb-4">
-                    <textarea x-model="whatsappMessageText" rows="10" class="w-full p-4 bg-emerald-50/40 border border-emerald-200 rounded-2xl text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 font-sans leading-relaxed"></textarea>
+                    <textarea x-model="whatsappMessageText" rows="8" class="w-full p-4 bg-emerald-50/40 border border-emerald-200 rounded-2xl text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 font-sans leading-relaxed"></textarea>
                 </div>
 
-                <!-- Botones de Acción (Solo enlace a WhatsApp directo) -->
+                <!-- Botones de Acción -->
                 <div class="flex flex-col sm:flex-row gap-3">
-                    <a :href="whatsappLink" target="_blank" @click="showWhatsappModal = false" class="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-medium py-3 px-4 rounded-xl text-xs shadow-sm transition flex items-center justify-center space-x-2">
+                    <button @click="copyWhatsAppMessage" class="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium py-3 px-4 rounded-xl text-xs transition flex items-center justify-center space-x-2">
+                        <i class="fa-solid fa-copy text-slate-500"></i>
+                        <span x-text="copiedFeedback ? '¡Copiado al Portapapeles!' : 'Copiar Texto'"></span>
+                    </button>
+                    <a :href="whatsappLink" target="_blank" @click="showWhatsappModal = false" class="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white font-medium py-3 px-4 rounded-xl text-xs shadow-sm transition flex items-center justify-center space-x-2">
                         <i class="fa-brands fa-whatsapp text-base"></i>
                         <span>Enviar por WhatsApp</span>
                     </a>
@@ -690,7 +690,6 @@
                 showEditClientModal: false,
                 showPaymentConfigModal: false,
                 copiedFeedback: false,
-                aliasCopiedFeedback: false,
                 toastMessage: '',
                 
                 activeClient: null,
@@ -726,7 +725,6 @@
                 movements: {},
                 systemUsers: [],
                 firebaseReady: false,
-                isConnected: false,
                 userId: null,
 
                 init() {
@@ -749,25 +747,21 @@
                                 if (user) {
                                     this.userId = user.uid;
                                     this.firebaseReady = true;
-                                    this.isConnected = true;
                                     this.initFirestoreListeners();
                                 } else {
                                     this.userId = crypto.randomUUID();
                                     this.firebaseReady = true;
-                                    this.isConnected = true;
                                     this.initFirestoreListeners();
                                 }
                             });
                         } catch (e) {
                             console.error("Error en autenticación Firebase:", e);
-                            this.isConnected = false;
                             this.loadLocalFallback();
                         }
                     });
 
                     setTimeout(() => {
                         if (!this.firebaseReady) {
-                            this.isConnected = false;
                             this.loadLocalFallback();
                         }
                     }, 3000);
@@ -807,7 +801,6 @@
                 initFirestoreListeners() {
                     const { db, appId, collection, onSnapshot } = window.firebaseAppInstance;
                     if (!db) {
-                        this.isConnected = false;
                         this.loadLocalFallback();
                         return;
                     }
@@ -815,7 +808,6 @@
                     // Escuchar Configuración de Pago
                     const configRef = collection(db, 'artifacts', appId, 'public', 'data', 'payment_config');
                     onSnapshot(configRef, (snapshot) => {
-                        this.isConnected = true;
                         snapshot.forEach(docSnap => {
                             if (docSnap.data() && docSnap.data().alias) {
                                 this.paymentConfig = docSnap.data();
@@ -823,13 +815,11 @@
                         });
                     }, (err) => {
                         console.error("Error cargando configuración de pago:", err);
-                        this.isConnected = false;
                     });
 
                     // Escuchar Clientes
                     const clientsCol = collection(db, 'artifacts', appId, 'public', 'data', 'clients');
                     onSnapshot(clientsCol, (snapshot) => {
-                        this.isConnected = true;
                         let loadedClients = [];
                         snapshot.forEach(docSnap => {
                             loadedClients.push({ firestoreId: docSnap.id, ...docSnap.data() });
@@ -843,7 +833,6 @@
                         }
                     }, (error) => {
                         console.error("Error al escuchar clientes:", error);
-                        this.isConnected = false;
                         this.loadLocalFallback();
                     });
 
@@ -1244,7 +1233,6 @@
                     
                     this.updateWhatsappMessage();
                     this.copiedFeedback = false;
-                    this.aliasCopiedFeedback = false;
                     this.showWhatsappModal = true;
                 },
 
@@ -1252,7 +1240,7 @@
                     if (!this.activeClient) return;
                     const clientMovs = this.movements[this.activeClient.id] || [];
                     
-                    // Filtrar movimientos desde la fecha seleccionada
+                    // Filtrar movimientos desde la fecha seleccionada (formato dd/mm/yyyy vs yyyy-mm-dd)
                     let filteredMovs = clientMovs;
                     if (this.whatsappStartDate) {
                         const parts = this.whatsappStartDate.split('-');
@@ -1280,10 +1268,25 @@
                         `📋 *Movimientos en el período:*\n${detailText}\n\n` +
                         `💰 *Saldo pendiente actual:* *${this.formatMoney(this.activeClient.balance)}*\n\n` +
                         `💳 *¿Deseas realizar la transferencia?*\n` +
-                        `Podés copiar y mantener presionado el siguiente Alias para transferir:\n` +
-                        `${this.paymentConfig.alias}\n\n` +
-                        `📱 Y por favor envianos el comprobante de pago a este número de WhatsApp: ${this.paymentConfig.whatsappReceiptNumber}.\n\n` +
+                        `Podés transferir al siguiente Alias:\n` +
+                        `🔹 *${this.paymentConfig.alias}*\n\n` +
+                        `📱 Y por favor envianos el comprobante de pago a este número de WhatsApp: *${this.paymentConfig.whatsappReceiptNumber}*.\n\n` +
                         `¡Muchas gracias por tu confianza! 🥩✨`;
+                },
+
+                copyWhatsAppMessage() {
+                    const textArea = document.createElement("textarea");
+                    textArea.value = this.whatsappMessageText;
+                    document.body.appendChild(textArea);
+                    textArea.select();
+                    try {
+                        document.execCommand('copy');
+                        this.copiedFeedback = true;
+                        setTimeout(() => this.copiedFeedback = false, 3000);
+                    } catch (err) {
+                        console.error('Error al copiar', err);
+                    }
+                    document.body.removeChild(textArea);
                 },
 
                 showToast(msg) {
