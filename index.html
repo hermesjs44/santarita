@@ -78,6 +78,12 @@
                     </div>
                 </div>
                 <div class="flex items-center space-x-2 sm:space-x-3">
+                    <!-- BOTÓN DE ESTADO DE CONEXIÓN FIREBASE -->
+                    <div class="hidden sm:flex items-center bg-indigo-900/40 px-3 py-2 rounded-xl border border-indigo-500/30 text-xs font-medium space-x-2" :title="firebaseStatusText">
+                        <span class="w-2.5 h-2.5 rounded-full animate-pulse" :class="firebaseConnected ? 'bg-emerald-400' : 'bg-amber-400'"></span>
+                        <span class="text-indigo-100" x-text="firebaseStatusText"></span>
+                    </div>
+
                     <!-- Botón Configuración de Pago (Diseñador o Administrador) -->
                     <template x-if="currentUser?.role === 'diseñador' || currentUser?.role === 'Administrador'">
                         <button @click="openPaymentConfigModal()" class="bg-indigo-700 hover:bg-indigo-800 text-white px-3 sm:px-4 py-2 rounded-xl text-sm font-medium shadow-sm transition flex items-center space-x-2" title="Configurar Alias y WhatsApp de pagos">
@@ -621,11 +627,12 @@
 
     </div>
 
-    <!-- Firebase SDKs (Modular v11) -->
+    <!-- Firebase SDKs (Modular v13.2.0 con soporte para Emuladores) -->
     <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, doc, setDoc, getDocs, addDoc, updateDoc, deleteDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/13.2.0/firebase-app.js";
+        import { getAnalytics } from "https://www.gstatic.com/firebasejs/13.2.0/firebase-analytics.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, connectAuthEmulator } from "https://www.gstatic.com/firebasejs/13.2.0/firebase-auth.js";
+        import { getFirestore, collection, doc, setDoc, getDocs, addDoc, updateDoc, deleteDoc, onSnapshot, connectFirestoreEmulator } from "https://www.gstatic.com/firebasejs/13.2.0/firebase-firestore.js";
 
         // Configuración de Firebase provista
         const firebaseConfig = {
@@ -642,8 +649,20 @@
 
         // Inicializar Firebase
         const app = initializeApp(firebaseConfig);
+        const analytics = getAnalytics(app);
         const auth = getAuth(app);
         const db = getFirestore(app);
+
+        // Conexión automática a emuladores locales si se ejecuta en localhost
+        if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") {
+            try {
+                connectAuthEmulator(auth, "http://127.0.0.1:9099", { disableWarnings: true });
+                connectFirestoreEmulator(db, "127.0.0.1", 8080);
+                console.log("Conectado a los emuladores locales de Firebase.");
+            } catch (e) {
+                // Ya conectados previamente
+            }
+        }
 
         // Exponer globalmente para Alpine.js
         window.firebaseAppInstance = {
@@ -727,12 +746,28 @@
                 firebaseReady: false,
                 userId: null,
 
+                // Estados de conexión Firebase
+                firebaseConnected: false,
+                firebaseStatusText: 'Verificando conexión...',
+
                 init() {
                     // Cargar sesión guardada localmente
                     const savedSession = localStorage.getItem('santarita_current_user');
                     if (savedSession) {
                         this.currentUser = JSON.parse(savedSession);
                     }
+
+                    // Monitorear conectividad global de red (navigator.onLine)
+                    window.addEventListener('online', () => {
+                        if (this.firebaseReady) {
+                            this.firebaseConnected = true;
+                            this.firebaseStatusText = 'Firebase Conectado';
+                        }
+                    });
+                    window.addEventListener('offline', () => {
+                        this.firebaseConnected = false;
+                        this.firebaseStatusText = 'Sin conexión (Modo Local)';
+                    });
 
                     window.addEventListener('firebase-ready', async () => {
                         const { auth, signInAnonymously, signInWithCustomToken } = window.firebaseAppInstance;
@@ -747,10 +782,14 @@
                                 if (user) {
                                     this.userId = user.uid;
                                     this.firebaseReady = true;
+                                    this.firebaseConnected = true;
+                                    this.firebaseStatusText = 'Firebase Conectado';
                                     this.initFirestoreListeners();
                                 } else {
                                     this.userId = crypto.randomUUID();
                                     this.firebaseReady = true;
+                                    this.firebaseConnected = true;
+                                    this.firebaseStatusText = 'Firebase Conectado';
                                     this.initFirestoreListeners();
                                 }
                             });
@@ -808,6 +847,8 @@
                     // Escuchar Configuración de Pago
                     const configRef = collection(db, 'artifacts', appId, 'public', 'data', 'payment_config');
                     onSnapshot(configRef, (snapshot) => {
+                        this.firebaseConnected = true;
+                        this.firebaseStatusText = 'Firebase Conectado';
                         snapshot.forEach(docSnap => {
                             if (docSnap.data() && docSnap.data().alias) {
                                 this.paymentConfig = docSnap.data();
@@ -815,11 +856,15 @@
                         });
                     }, (err) => {
                         console.error("Error cargando configuración de pago:", err);
+                        this.firebaseConnected = false;
+                        this.firebaseStatusText = 'Error de conexión Firestore';
                     });
 
                     // Escuchar Clientes
                     const clientsCol = collection(db, 'artifacts', appId, 'public', 'data', 'clients');
                     onSnapshot(clientsCol, (snapshot) => {
+                        this.firebaseConnected = true;
+                        this.firebaseStatusText = 'Firebase Conectado';
                         let loadedClients = [];
                         snapshot.forEach(docSnap => {
                             loadedClients.push({ firestoreId: docSnap.id, ...docSnap.data() });
@@ -833,6 +878,8 @@
                         }
                     }, (error) => {
                         console.error("Error al escuchar clientes:", error);
+                        this.firebaseConnected = false;
+                        this.firebaseStatusText = 'Sin conexión (Modo Local)';
                         this.loadLocalFallback();
                     });
 
@@ -845,7 +892,6 @@
                         });
 
                         if (loadedUsers.length === 0) {
-                            // Crear usuarios iniciales por defecto
                             this.seedInitialUsers();
                         } else {
                             this.systemUsers = loadedUsers;
@@ -915,6 +961,9 @@
                 },
 
                 loadLocalFallback() {
+                    this.firebaseConnected = false;
+                    this.firebaseStatusText = 'Modo Local (Sin conexión)';
+                    
                     const savedClients = localStorage.getItem('santarita_clients');
                     const savedMovements = localStorage.getItem('santarita_movements');
                     const savedUsers = localStorage.getItem('santarita_system_users');
@@ -956,7 +1005,7 @@
 
                 async savePaymentConfig() {
                     const { db, appId, doc, setDoc } = window.firebaseAppInstance;
-                    if (db) {
+                    if (db && this.firebaseConnected) {
                         try {
                             const configRef = doc(db, 'artifacts', appId, 'public', 'data', 'payment_config', 'settings');
                             await setDoc(configRef, this.paymentConfig);
@@ -991,7 +1040,7 @@
                     if (!this.editingClient.name || !this.editingClient.phone) return;
                     
                     const { db, appId, doc, setDoc } = window.firebaseAppInstance;
-                    if (db) {
+                    if (db && this.firebaseConnected) {
                         try {
                             const clientRef = doc(db, 'artifacts', appId, 'public', 'data', 'clients', String(this.editingClient.id));
                             await setDoc(clientRef, this.editingClient, { merge: true });
@@ -1015,7 +1064,7 @@
                     if (!confirm('¿Estás seguro de eliminar este cliente y todos sus datos?')) return;
                     
                     const { db, appId, doc, deleteDoc } = window.firebaseAppInstance;
-                    if (db) {
+                    if (db && this.firebaseConnected) {
                         try {
                             const clientRef = doc(db, 'artifacts', appId, 'public', 'data', 'clients', String(id));
                             await deleteDoc(clientRef);
@@ -1047,7 +1096,7 @@
                     };
 
                     const { db, appId, doc, setDoc } = window.firebaseAppInstance;
-                    if (db) {
+                    if (db && this.firebaseConnected) {
                         try {
                             const uRef = doc(db, 'artifacts', appId, 'public', 'data', 'system_users', String(newId));
                             await setDoc(uRef, userObj);
@@ -1067,7 +1116,7 @@
 
                 async deleteSystemUser(id) {
                     const { db, appId, doc, deleteDoc } = window.firebaseAppInstance;
-                    if (db) {
+                    if (db && this.firebaseConnected) {
                         try {
                             const uRef = doc(db, 'artifacts', appId, 'public', 'data', 'system_users', String(id));
                             await deleteDoc(uRef);
@@ -1142,7 +1191,7 @@
                     };
 
                     const { db, appId, doc, setDoc } = window.firebaseAppInstance;
-                    if (db) {
+                    if (db && this.firebaseConnected) {
                         try {
                             const clientRef = doc(db, 'artifacts', appId, 'public', 'data', 'clients', String(newId));
                             await setDoc(clientRef, created);
@@ -1167,7 +1216,6 @@
 
                 openMovementModal(type) {
                     this.movementType = type;
-                    // Obtener fecha actual en formato yyyy-mm-dd para el input type="date"
                     const todayStr = new Date().toISOString().split('T')[0];
                     this.movementForm = { description: '', amount: '', date: todayStr };
                     this.showMovementModal = true;
@@ -1184,7 +1232,6 @@
                         newBalance = Math.max(0, newBalance - amount);
                     }
 
-                    // Formatear la fecha seleccionada de yyyy-mm-dd a dd/mm/aaaa para mostrarla amigablemente
                     const dateParts = this.movementForm.date.split('-');
                     const formattedDate = dateParts.length === 3 ? `${dateParts[2]}/${dateParts[1]}/${dateParts[0]}` : this.movementForm.date;
 
@@ -1197,7 +1244,7 @@
                     };
 
                     const { db, appId, doc, setDoc } = window.firebaseAppInstance;
-                    if (db) {
+                    if (db && this.firebaseConnected) {
                         try {
                             const clientRef = doc(db, 'artifacts', appId, 'public', 'data', 'clients', String(this.activeClient.id));
                             await setDoc(clientRef, { ...this.activeClient, balance: newBalance }, { merge: true });
@@ -1226,7 +1273,6 @@
 
                 openWhatsAppModal(client) {
                     this.activeClient = client;
-                    // Por defecto inicializar la fecha de filtro hace 30 días o tomar la fecha del movimiento más antiguo
                     const d = new Date();
                     d.setDate(d.getDate() - 30);
                     this.whatsappStartDate = d.toISOString().split('T')[0];
@@ -1240,7 +1286,6 @@
                     if (!this.activeClient) return;
                     const clientMovs = this.movements[this.activeClient.id] || [];
                     
-                    // Filtrar movimientos desde la fecha seleccionada (formato dd/mm/yyyy vs yyyy-mm-dd)
                     let filteredMovs = clientMovs;
                     if (this.whatsappStartDate) {
                         const parts = this.whatsappStartDate.split('-');
