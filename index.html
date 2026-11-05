@@ -166,7 +166,7 @@
                     <span class="absolute inset-y-0 left-0 flex items-center pl-3.5 text-slate-400">
                         <i class="fa-solid fa-search"></i>
                     </span>
-                    <input type="text" x-model="searchQuery" placeholder="Buscar por nombre o teléfono..." class="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition">
+                    <input type="text" x-model="searchQuery" placeholder="Buscar por nombre, teléfono o dirección..." class="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition">
                 </div>
                 <div class="flex items-center space-x-2 w-full sm:w-auto overflow-x-auto pb-1 sm:pb-0">
                     <button @click="filterStatus = 'all'" :class="filterStatus === 'all' ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'" class="px-4 py-2 rounded-xl text-xs font-semibold transition whitespace-nowrap">
@@ -195,6 +195,9 @@
                                         <h4 class="font-bold text-slate-800 text-base" x-text="client.name"></h4>
                                         <p class="text-xs text-slate-400 flex items-center gap-1 mt-0.5">
                                             <i class="fa-solid fa-phone text-[10px]"></i> <span x-text="client.phone"></span>
+                                        </p>
+                                        <p class="text-xs text-slate-400 flex items-center gap-1 mt-0.5" x-show="client.address">
+                                            <i class="fa-solid fa-location-dot text-[10px]"></i> <span x-text="client.address"></span>
                                         </p>
                                     </div>
                                 </div>
@@ -254,7 +257,11 @@
                         </div>
                         <div>
                             <label class="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1">Teléfono (WhatsApp)</label>
-                            <input type="text" x-model="newClient.phone" required placeholder="Ej. +54 9 11 1234-5678" class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                            <input type="text" x-model="newClient.phone" required placeholder="+549..." class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 font-medium">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1">Dirección <span class="text-slate-400 font-normal">(Opcional)</span></label>
+                            <input type="text" x-model="newClient.address" placeholder="Ej. Av. San Martín 1234" class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
                         </div>
                     </div>
                     <div class="mt-6 flex space-x-3">
@@ -278,6 +285,9 @@
                             <h3 class="text-lg font-bold text-slate-800" x-text="activeClient ? activeClient.name : ''"></h3>
                             <p class="text-xs text-slate-400 flex items-center gap-1 mt-0.5">
                                 <i class="fa-solid fa-phone text-[10px]"></i> <span x-text="activeClient ? activeClient.phone : ''"></span>
+                            </p>
+                            <p class="text-xs text-slate-400 flex items-center gap-1 mt-0.5" x-show="activeClient?.address">
+                                <i class="fa-solid fa-location-dot text-[10px]"></i> <span x-text="activeClient ? activeClient.address : ''"></span>
                             </p>
                         </div>
                     </div>
@@ -378,8 +388,10 @@
                                     </div>
                                     <div>
                                         <h4 class="font-bold text-slate-800 text-sm" x-text="client.name"></h4>
-                                        <p class="text-xs text-slate-400 flex items-center gap-2 mt-0.5">
+                                        <p class="text-xs text-slate-400 flex items-center gap-2 mt-0.5 flex-wrap">
                                             <span><i class="fa-solid fa-phone text-[10px]"></i> <span x-text="client.phone"></span></span>
+                                            <span x-show="client.address">•</span>
+                                            <span x-show="client.address"><i class="fa-solid fa-location-dot text-[10px]"></i> <span x-text="client.address"></span></span>
                                             <span>•</span>
                                             <span class="font-semibold text-slate-600">Saldo: <span :class="client.balance > 0 ? 'text-rose-600' : 'text-emerald-600'" x-text="formatMoney(client.balance)"></span></span>
                                         </p>
@@ -428,6 +440,10 @@
                         <div>
                             <label class="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1">Teléfono (WhatsApp)</label>
                             <input type="text" x-model="editingClient.phone" required class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1">Dirección <span class="text-slate-400 font-normal">(Opcional)</span></label>
+                            <input type="text" x-model="editingClient.address" placeholder="Ej. Av. San Martín 1234" class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
                         </div>
                         <div>
                             <label class="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1">Saldo Deuda Actual ($)</label>
@@ -651,8 +667,6 @@
         const auth = getAuth(app);
         const db = getFirestore(app);
 
-        // La aplicación utiliza el proyecto Firebase real también cuando se abre en localhost.
-
         // Exponer globalmente para Alpine.js
         window.firebaseAppInstance = {
             auth,
@@ -702,7 +716,7 @@
                 toastMessage: '',
                 
                 activeClient: null,
-                editingClient: { id: null, name: '', phone: '', balance: 0 },
+                editingClient: { id: null, name: '', phone: '', address: '', balance: 0 },
                 movementType: 'debt', // debt or payment
                 
                 paymentConfig: {
@@ -712,7 +726,8 @@
 
                 newClient: {
                     name: '',
-                    phone: ''
+                    phone: '+549',
+                    address: ''
                 },
 
                 newUserForm: {
@@ -742,13 +757,11 @@
                 firebaseAuthStarted: false,
 
                 init() {
-                    // Cargar sesión guardada localmente
                     const savedSession = localStorage.getItem('santarita_current_user');
                     if (savedSession) {
                         this.currentUser = JSON.parse(savedSession);
                     }
 
-                    // Monitorear conectividad global de red (navigator.onLine)
                     window.addEventListener('online', () => {
                         if (this.firebaseReady) {
                             this.firebaseConnected = true;
@@ -772,7 +785,6 @@
                                 await signInAnonymously(auth);
                             }
 
-                            // Firebase v9+ modular: onAuthStateChanged(auth, callback).
                             onAuthStateChanged(auth, (user) => {
                                 if (user) {
                                     this.userId = user.uid;
@@ -796,11 +808,9 @@
                         }
                     };
 
-                    // El módulo puede haber emitido el evento antes de que Alpine inicialice.
                     window.addEventListener('firebase-ready', startFirebaseAuth);
                     if (window.firebaseAppInstance) startFirebaseAuth();
 
-                    // No cambiar a modo local por una demora breve de red o autenticación.
                     setTimeout(() => {
                         if (!this.firebaseReady && !window.firebaseAppInstance) {
                             this.firebaseStatusText = 'Firebase no se pudo inicializar';
@@ -814,7 +824,6 @@
                     const uname = this.loginForm.username.trim().toLowerCase();
                     const pwd = this.loginForm.password.trim();
 
-                    // Verificar Diseñador Maestro Hardcodeado
                     if (uname === 'diseñador' && pwd === 'Hjs2154') {
                         this.currentUser = { username: 'Diseñador', role: 'diseñador' };
                         localStorage.setItem('santarita_current_user', JSON.stringify(this.currentUser));
@@ -822,7 +831,6 @@
                         return;
                     }
 
-                    // Verificar en la lista de usuarios del sistema
                     const foundUser = this.systemUsers.find(u => u.username.toLowerCase() === uname && u.password === pwd);
                     if (foundUser) {
                         this.currentUser = { username: foundUser.username, role: foundUser.role };
@@ -847,7 +855,6 @@
                         return;
                     }
 
-                    // Escuchar Configuración de Pago
                     const configRef = collection(db, 'artifacts', appId, 'public', 'data', 'payment_config');
                     onSnapshot(configRef, (snapshot) => {
                         this.firebaseConnected = true;
@@ -863,7 +870,6 @@
                         this.firebaseStatusText = 'Error de conexión Firestore';
                     });
 
-                    // Escuchar Clientes
                     const clientsCol = collection(db, 'artifacts', appId, 'public', 'data', 'clients');
                     onSnapshot(clientsCol, (snapshot) => {
                         this.firebaseConnected = true;
@@ -886,7 +892,6 @@
                         this.loadLocalFallback();
                     });
 
-                    // Escuchar Usuarios del Sistema
                     const usersCol = collection(db, 'artifacts', appId, 'public', 'data', 'system_users');
                     onSnapshot(usersCol, (snapshot) => {
                         let loadedUsers = [];
@@ -920,10 +925,10 @@
                 async seedInitialData() {
                     const { db, appId, doc, setDoc } = window.firebaseAppInstance;
                     const initialClients = [
-                        { id: 1, name: 'Carlos Mendoza', phone: '+5491144556677', balance: 8450 },
-                        { id: 2, name: 'Ana Sofía Ruiz', phone: '+5491122334455', balance: 0 },
-                        { id: 3, name: 'Esteban Quirroga', phone: '+5491199887766', balance: 14200 },
-                        { id: 4, name: 'Mariela Giménez', phone: '+5491155443322', balance: 3100 }
+                        { id: 1, name: 'Carlos Mendoza', phone: '+5491144556677', address: 'Av. Libertador 450', balance: 8450 },
+                        { id: 2, name: 'Ana Sofía Ruiz', phone: '+5491122334455', address: '', balance: 0 },
+                        { id: 3, name: 'Esteban Quirroga', phone: '+5491199887766', address: 'Calle 9 de Julio 120', balance: 14200 },
+                        { id: 4, name: 'Mariela Giménez', phone: '+5491155443322', address: 'Belgrano 890', balance: 3100 }
                     ];
 
                     const initialMovs = {
@@ -975,13 +980,12 @@
                     if (savedClients) this.clients = JSON.parse(savedClients);
                     else {
                         this.clients = [
-                            { id: 1, name: 'Carlos Mendoza', phone: '+5491144556677', balance: 8450 },
-                            { id: 2, name: 'Ana Sofía Ruiz', phone: '+5491122334455', balance: 0 }
+                            { id: 1, name: 'Carlos Mendoza', phone: '+5491144556677', address: 'Av. Libertador 450', balance: 8450 },
+                            { id: 2, name: 'Ana Sofía Ruiz', phone: '+5491122334455', address: '', balance: 0 }
                         ];
                     }
 
                     if (savedMovements) this.movements = JSON.parse(savedMovements);
-                    
                     if (savedUsers) this.systemUsers = JSON.parse(savedUsers);
                     else {
                         this.systemUsers = [
@@ -1021,7 +1025,7 @@
                     } else this.saveDataLocal();
 
                     this.showPaymentConfigModal = false;
-                    this.showToast(savedToCloud ? 'Ajustes guardados en Firebase' : 'Guardado solo en este dispositivo; no llegó a Firebase');
+                    this.showToast(savedToCloud ? 'Ajustes guardados en Firebase' : 'Guardado solo en este dispositivo');
                 },
 
                 openUsersModal() {
@@ -1035,7 +1039,7 @@
                 },
 
                 openEditClientModal(client) {
-                    this.editingClient = { ...client };
+                    this.editingClient = { address: '', ...client };
                     this.showEditClientModal = true;
                 },
 
@@ -1076,7 +1080,7 @@
                             this.showToast('Cliente eliminado de Firebase');
                         } catch (e) {
                             console.error('Error eliminando cliente de Firestore:', e);
-                            this.showToast('No se pudo eliminar en Firebase. Revisá la conexión y los permisos.');
+                            this.showToast('No se pudo eliminar en Firebase.');
                             return;
                         }
                     } else {
@@ -1089,7 +1093,8 @@
                 get filteredManageClients() {
                     return this.clients.filter(client => {
                         return client.name.toLowerCase().includes(this.clientSearchQuery.toLowerCase()) || 
-                               client.phone.includes(this.clientSearchQuery);
+                               client.phone.includes(this.clientSearchQuery) ||
+                               (client.address && client.address.toLowerCase().includes(this.clientSearchQuery.toLowerCase()));
                     });
                 },
 
@@ -1133,7 +1138,7 @@
                             this.showToast('Usuario eliminado de Firebase');
                         } catch (e) {
                             console.error('Error eliminando usuario de Firestore:', e);
-                            this.showToast('No se pudo eliminar en Firebase. Revisá la conexión y los permisos.');
+                            this.showToast('No se pudo eliminar en Firebase.');
                             return;
                         }
                     } else {
@@ -1146,7 +1151,8 @@
                 get filteredClients() {
                     return this.clients.filter(client => {
                         const matchesSearch = client.name.toLowerCase().includes(this.searchQuery.toLowerCase()) || 
-                                              client.phone.includes(this.searchQuery);
+                                              client.phone.includes(this.searchQuery) ||
+                                              (client.address && client.address.toLowerCase().includes(this.searchQuery.toLowerCase()));
                         if (this.filterStatus === 'debt') return matchesSearch && client.balance > 0;
                         if (this.filterStatus === 'ok') return matchesSearch && client.balance === 0;
                         return matchesSearch;
@@ -1190,7 +1196,7 @@
                 },
 
                 openNewClientModal() {
-                    this.newClient = { name: '', phone: '' };
+                    this.newClient = { name: '', phone: '+549', address: '' };
                     this.showNewClientModal = true;
                 },
 
@@ -1201,6 +1207,7 @@
                         id: newId,
                         name: this.newClient.name,
                         phone: this.newClient.phone,
+                        address: this.newClient.address || '',
                         balance: 0
                     };
 
@@ -1233,7 +1240,9 @@
                 openMovementModal(type) {
                     this.movementType = type;
                     const todayStr = new Date().toISOString().split('T')[0];
-                    this.movementForm = { description: '', amount: '', date: todayStr };
+                    const defaultDescription = (type === 'debt') ? 'Varios' : '';
+
+                    this.movementForm = { description: defaultDescription, amount: '', date: todayStr };
                     this.showMovementModal = true;
                 },
 
@@ -1265,7 +1274,6 @@
                         try {
                             const clientRef = doc(db, 'artifacts', appId, 'public', 'data', 'clients', String(this.activeClient.id));
                             const movRef = doc(db, 'artifacts', appId, 'public', 'data', `client_${this.activeClient.id}_movements`, String(mov.id));
-                            // Guardar movimiento y saldo en una única operación lógica.
                             const { writeBatch } = await import('https://www.gstatic.com/firebasejs/13.2.0/firebase-firestore.js');
                             const batch = writeBatch(db);
                             batch.set(clientRef, { ...this.activeClient, balance: newBalance }, { merge: true });
@@ -1288,7 +1296,7 @@
                     }
 
                     this.showMovementModal = false;
-                    this.showToast(savedToCloud ? (this.movementType === 'debt' ? 'Fiado guardado en Firebase' : 'Pago guardado en Firebase') : 'Movimiento guardado solo en este dispositivo; no llegó a Firebase');
+                    this.showToast(savedToCloud ? (this.movementType === 'debt' ? 'Fiado guardado en Firebase' : 'Pago guardado en Firebase') : 'Movimiento guardado solo en este dispositivo');
                 },
 
                 openWhatsAppModal(client) {
@@ -1323,7 +1331,13 @@
                     }
 
                     let detailText = filteredMovs.length > 0 
-                        ? filteredMovs.map(m => `• ${m.date} - ${m.description}: $${m.amount}`).join('\n')
+                        ? filteredMovs.map(m => {
+                            if (m.type === 'payment') {
+                                return `💳 *${m.date} - Pago efectuado (${m.description}): - $${m.amount}*`;
+                            } else {
+                                return `• ${m.date} - ${m.description}: $${m.amount}`;
+                            }
+                        }).join('\n')
                         : '• Ningún movimiento en este período.';
                     
                     const dateParts = this.whatsappStartDate.split('-');
