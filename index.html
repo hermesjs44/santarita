@@ -630,9 +630,8 @@
     <!-- Firebase SDKs (Modular v13.2.0 con soporte para Emuladores) -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/13.2.0/firebase-app.js";
-        import { getAnalytics } from "https://www.gstatic.com/firebasejs/13.2.0/firebase-analytics.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, connectAuthEmulator } from "https://www.gstatic.com/firebasejs/13.2.0/firebase-auth.js";
-        import { getFirestore, collection, doc, setDoc, getDocs, addDoc, updateDoc, deleteDoc, onSnapshot, connectFirestoreEmulator } from "https://www.gstatic.com/firebasejs/13.2.0/firebase-firestore.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/13.2.0/firebase-auth.js";
+        import { getFirestore, collection, doc, setDoc, getDocs, addDoc, updateDoc, deleteDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/13.2.0/firebase-firestore.js";
 
         // Configuración de Firebase provista
         const firebaseConfig = {
@@ -649,20 +648,10 @@
 
         // Inicializar Firebase
         const app = initializeApp(firebaseConfig);
-        const analytics = getAnalytics(app);
         const auth = getAuth(app);
         const db = getFirestore(app);
 
-        // Conexión automática a emuladores locales si se ejecuta en localhost
-        if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") {
-            try {
-                connectAuthEmulator(auth, "http://127.0.0.1:9099", { disableWarnings: true });
-                connectFirestoreEmulator(db, "127.0.0.1", 8080);
-                console.log("Conectado a los emuladores locales de Firebase.");
-            } catch (e) {
-                // Ya conectados previamente
-            }
-        }
+        // La aplicación utiliza el proyecto Firebase real también cuando se abre en localhost.
 
         // Exponer globalmente para Alpine.js
         window.firebaseAppInstance = {
@@ -678,6 +667,7 @@
             getDocs,
             addDoc,
             updateDoc,
+            deleteDoc,
             onSnapshot
         };
 
@@ -749,6 +739,7 @@
                 // Estados de conexión Firebase
                 firebaseConnected: false,
                 firebaseStatusText: 'Verificando conexión...',
+                firebaseAuthStarted: false,
 
                 init() {
                     // Cargar sesión guardada localmente
@@ -769,45 +760,53 @@
                         this.firebaseStatusText = 'Sin conexión (Modo Local)';
                     });
 
-                    window.addEventListener('firebase-ready', async () => {
-                        const { auth, signInAnonymously, signInWithCustomToken } = window.firebaseAppInstance;
+                    const startFirebaseAuth = async () => {
+                        const instance = window.firebaseAppInstance;
+                        if (!instance || this.firebaseAuthStarted) return;
+                        this.firebaseAuthStarted = true;
+                        const { auth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } = instance;
                         try {
                             if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
                                 await signInWithCustomToken(auth, __initial_auth_token);
-                            } else {
-                                // Forzar de forma explícita el inicio anónimo si no hay sesión previa
-                                if (!auth.currentUser) {
-                                    await signInAnonymously(auth);
-                                }
+                            } else if (!auth.currentUser) {
+                                await signInAnonymously(auth);
                             }
-                            
-                            // Escuchar cambios de estado una vez forzado
-                            auth.onAuthStateChanged((user) => {
+
+                            // Firebase v9+ modular: onAuthStateChanged(auth, callback).
+                            onAuthStateChanged(auth, (user) => {
                                 if (user) {
                                     this.userId = user.uid;
                                     this.firebaseReady = true;
                                     this.firebaseConnected = true;
-                                    this.firebaseStatusText = 'Firebase Conectado';
+                                    this.firebaseStatusText = 'Conectando con Firestore...';
                                     this.initFirestoreListeners();
                                 } else {
-                                    this.userId = crypto.randomUUID();
+                                    this.userId = null;
                                     this.firebaseReady = true;
                                     this.firebaseConnected = false;
-                                    this.firebaseStatusText = 'Sin sesión (Modo Local)';
+                                    this.firebaseStatusText = 'Sin sesión de Firebase';
                                     this.loadLocalFallback();
                                 }
                             });
                         } catch (e) {
-                            console.error("Error crítico en autenticación Firebase:", e);
+                            console.error('Error crítico en autenticación Firebase:', e);
+                            this.firebaseAuthStarted = false;
+                            this.firebaseStatusText = 'Error de autenticación Firebase';
                             this.loadLocalFallback();
                         }
-                    });
+                    };
 
+                    // El módulo puede haber emitido el evento antes de que Alpine inicialice.
+                    window.addEventListener('firebase-ready', startFirebaseAuth);
+                    if (window.firebaseAppInstance) startFirebaseAuth();
+
+                    // No cambiar a modo local por una demora breve de red o autenticación.
                     setTimeout(() => {
-                        if (!this.firebaseReady) {
+                        if (!this.firebaseReady && !window.firebaseAppInstance) {
+                            this.firebaseStatusText = 'Firebase no se pudo inicializar';
                             this.loadLocalFallback();
                         }
-                    }, 3000);
+                    }, 10000);
                 },
 
                 handleLogin() {
@@ -1008,21 +1007,21 @@
                 },
 
                 async savePaymentConfig() {
-                    const { db, appId, doc, setDoc } = window.firebaseAppInstance;
+                    const { db, appId, doc, setDoc } = window.firebaseAppInstance || {};
+                    let savedToCloud = false;
                     if (db && this.firebaseConnected) {
                         try {
                             const configRef = doc(db, 'artifacts', appId, 'public', 'data', 'payment_config', 'settings');
                             await setDoc(configRef, this.paymentConfig);
+                            savedToCloud = true;
                         } catch (e) {
-                            console.error("Error guardando configuración de pago:", e);
+                            console.error('Error guardando configuración de pago en Firestore:', e);
                             this.saveDataLocal();
                         }
-                    } else {
-                        this.saveDataLocal();
-                    }
+                    } else this.saveDataLocal();
 
                     this.showPaymentConfigModal = false;
-                    this.showToast('Ajustes de pago guardados con éxito');
+                    this.showToast(savedToCloud ? 'Ajustes guardados en Firebase' : 'Guardado solo en este dispositivo; no llegó a Firebase');
                 },
 
                 openUsersModal() {
@@ -1043,13 +1042,15 @@
                 async updateClientData() {
                     if (!this.editingClient.name || !this.editingClient.phone) return;
                     
-                    const { db, appId, doc, setDoc } = window.firebaseAppInstance;
+                    const { db, appId, doc, setDoc } = window.firebaseAppInstance || {};
+                    let savedToCloud = false;
                     if (db && this.firebaseConnected) {
                         try {
                             const clientRef = doc(db, 'artifacts', appId, 'public', 'data', 'clients', String(this.editingClient.id));
                             await setDoc(clientRef, this.editingClient, { merge: true });
+                            savedToCloud = true;
                         } catch (e) {
-                            console.error("Error actualizando cliente en Firestore:", e);
+                            console.error('Error actualizando cliente en Firestore:', e);
                             const index = this.clients.findIndex(c => c.id === this.editingClient.id);
                             if (index !== -1) this.clients[index] = { ...this.editingClient };
                             this.saveDataLocal();
@@ -1061,25 +1062,28 @@
                     }
 
                     this.showEditClientModal = false;
-                    this.showToast('Cliente actualizado correctamente');
+                    this.showToast(savedToCloud ? 'Cliente actualizado en Firebase' : 'Cambios guardados solo en este dispositivo');
                 },
 
                 async deleteClient(id) {
                     if (!confirm('¿Estás seguro de eliminar este cliente y todos sus datos?')) return;
                     
-                    const { db, appId, doc, deleteDoc } = window.firebaseAppInstance;
+                    const { db, appId, doc, deleteDoc } = window.firebaseAppInstance || {};
                     if (db && this.firebaseConnected) {
                         try {
                             const clientRef = doc(db, 'artifacts', appId, 'public', 'data', 'clients', String(id));
                             await deleteDoc(clientRef);
+                            this.showToast('Cliente eliminado de Firebase');
                         } catch (e) {
-                            console.error("Error eliminando cliente:", e);
+                            console.error('Error eliminando cliente de Firestore:', e);
+                            this.showToast('No se pudo eliminar en Firebase. Revisá la conexión y los permisos.');
+                            return;
                         }
+                    } else {
+                        this.clients = this.clients.filter(c => c.id !== id);
+                        this.saveDataLocal();
+                        this.showToast('Cliente eliminado solo de este dispositivo');
                     }
-
-                    this.clients = this.clients.filter(c => c.id !== id);
-                    this.saveDataLocal();
-                    this.showToast('Cliente eliminado');
                 },
 
                 get filteredManageClients() {
@@ -1099,13 +1103,15 @@
                         role: this.newUserForm.role
                     };
 
-                    const { db, appId, doc, setDoc } = window.firebaseAppInstance;
+                    const { db, appId, doc, setDoc } = window.firebaseAppInstance || {};
+                    let savedToCloud = false;
                     if (db && this.firebaseConnected) {
                         try {
                             const uRef = doc(db, 'artifacts', appId, 'public', 'data', 'system_users', String(newId));
                             await setDoc(uRef, userObj);
+                            savedToCloud = true;
                         } catch (e) {
-                            console.error("Error guardando usuario en Firestore:", e);
+                            console.error('Error guardando usuario en Firestore:', e);
                             this.systemUsers.push(userObj);
                             this.saveDataLocal();
                         }
@@ -1115,22 +1121,26 @@
                     }
 
                     this.newUserForm = { username: '', password: '', role: 'Administrador' };
-                    this.showToast('Usuario creado con éxito');
+                    this.showToast(savedToCloud ? 'Usuario creado en Firebase' : 'Usuario guardado solo en este dispositivo');
                 },
 
                 async deleteSystemUser(id) {
-                    const { db, appId, doc, deleteDoc } = window.firebaseAppInstance;
+                    const { db, appId, doc, deleteDoc } = window.firebaseAppInstance || {};
                     if (db && this.firebaseConnected) {
                         try {
                             const uRef = doc(db, 'artifacts', appId, 'public', 'data', 'system_users', String(id));
                             await deleteDoc(uRef);
+                            this.showToast('Usuario eliminado de Firebase');
                         } catch (e) {
-                            console.error("Error eliminando usuario:", e);
+                            console.error('Error eliminando usuario de Firestore:', e);
+                            this.showToast('No se pudo eliminar en Firebase. Revisá la conexión y los permisos.');
+                            return;
                         }
+                    } else {
+                        this.systemUsers = this.systemUsers.filter(u => u.id !== id);
+                        this.saveDataLocal();
+                        this.showToast('Usuario eliminado solo de este dispositivo');
                     }
-                    this.systemUsers = this.systemUsers.filter(u => u.id !== id);
-                    this.saveDataLocal();
-                    this.showToast('Usuario eliminado');
                 },
 
                 get filteredClients() {
@@ -1194,13 +1204,15 @@
                         balance: 0
                     };
 
-                    const { db, appId, doc, setDoc } = window.firebaseAppInstance;
+                    const { db, appId, doc, setDoc } = window.firebaseAppInstance || {};
+                    let savedToCloud = false;
                     if (db && this.firebaseConnected) {
                         try {
                             const clientRef = doc(db, 'artifacts', appId, 'public', 'data', 'clients', String(newId));
                             await setDoc(clientRef, created);
+                            savedToCloud = true;
                         } catch (e) {
-                            console.error("Error guardando cliente en Firestore:", e);
+                            console.error('Error guardando cliente en Firestore:', e);
                             this.clients.unshift(created);
                             this.saveDataLocal();
                         }
@@ -1210,7 +1222,7 @@
                     }
 
                     this.showNewClientModal = false;
-                    this.showToast('Cliente registrado correctamente');
+                    this.showToast(savedToCloud ? 'Cliente guardado en Firebase' : 'Cliente guardado solo en este dispositivo');
                 },
 
                 openDetailModal(client) {
@@ -1247,18 +1259,22 @@
                         date: formattedDate
                     };
 
-                    const { db, appId, doc, setDoc } = window.firebaseAppInstance;
+                    const { db, appId, doc, setDoc } = window.firebaseAppInstance || {};
+                    let savedToCloud = false;
                     if (db && this.firebaseConnected) {
                         try {
                             const clientRef = doc(db, 'artifacts', appId, 'public', 'data', 'clients', String(this.activeClient.id));
-                            await setDoc(clientRef, { ...this.activeClient, balance: newBalance }, { merge: true });
-
                             const movRef = doc(db, 'artifacts', appId, 'public', 'data', `client_${this.activeClient.id}_movements`, String(mov.id));
-                            await setDoc(movRef, mov);
-
+                            // Guardar movimiento y saldo en una única operación lógica.
+                            const { writeBatch } = await import('https://www.gstatic.com/firebasejs/13.2.0/firebase-firestore.js');
+                            const batch = writeBatch(db);
+                            batch.set(clientRef, { ...this.activeClient, balance: newBalance }, { merge: true });
+                            batch.set(movRef, mov);
+                            await batch.commit();
+                            savedToCloud = true;
                             this.activeClient.balance = newBalance;
                         } catch (e) {
-                            console.error("Error al guardar movimiento:", e);
+                            console.error('Error al guardar movimiento en Firestore:', e);
                             this.activeClient.balance = newBalance;
                             if (!this.movements[this.activeClient.id]) this.movements[this.activeClient.id] = [];
                             this.movements[this.activeClient.id].unshift(mov);
@@ -1272,7 +1288,7 @@
                     }
 
                     this.showMovementModal = false;
-                    this.showToast(this.movementType === 'debt' ? 'Fiado registrado con éxito' : 'Pago registrado con éxito');
+                    this.showToast(savedToCloud ? (this.movementType === 'debt' ? 'Fiado guardado en Firebase' : 'Pago guardado en Firebase') : 'Movimiento guardado solo en este dispositivo; no llegó a Firebase');
                 },
 
                 openWhatsAppModal(client) {
