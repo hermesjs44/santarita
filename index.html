@@ -55,10 +55,6 @@
                             Iniciar Sesión
                         </button>
                     </form>
-
-                    <div class="mt-6 pt-4 border-t border-slate-100 text-center">
-                        <p class="text-[11px] text-slate-400">Acceso maestro Diseñador: usuario <span class="font-semibold text-slate-600">diseñador</span> / clave <span class="font-semibold text-slate-600">Hjs2154</span></p>
-                    </div>
                 </div>
             </div>
         </template>
@@ -78,10 +74,12 @@
                     </div>
                 </div>
                 <div class="flex items-center space-x-2 sm:space-x-3">
-                    <!-- BOTÓN DE ESTADO DE CONEXIÓN FIREBASE -->
-                    <div class="hidden sm:flex items-center bg-indigo-900/40 px-3 py-2 rounded-xl border border-indigo-500/30 text-xs font-medium space-x-2" :title="firebaseStatusText">
-                        <span class="w-2.5 h-2.5 rounded-full animate-pulse" :class="firebaseConnected ? 'bg-emerald-400' : 'bg-amber-400'"></span>
-                        <span class="text-indigo-100" x-text="firebaseStatusText"></span>
+                    <!-- Indicador de estado de conexión Firebase -->
+                    <div class="p-2.5 rounded-xl bg-white/10 flex items-center justify-center">
+                        <span class="relative flex h-3 w-3">
+                            <span x-show="isConnected" class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                            <span class="relative inline-flex rounded-full h-3 w-3" :class="isConnected ? 'bg-emerald-500' : 'bg-rose-500'"></span>
+                        </span>
                     </div>
 
                     <!-- Botón Configuración de Pago (Diseñador o Administrador) -->
@@ -568,20 +566,16 @@
                     <input type="date" x-model="whatsappStartDate" @change="updateWhatsappMessage()" class="px-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500">
                 </div>
 
-                <p class="text-xs text-slate-500 mb-2">Puedes revisar y personalizar el mensaje antes de enviarlo directamente por WhatsApp al cliente.</p>
+                <p class="text-xs text-slate-500 mb-2">Vista previa del mensaje que recibirá el cliente (con el alias listo para copiar y transferir fácilmente):</p>
                 
                 <!-- Área de texto del mensaje -->
                 <div class="relative mb-4">
-                    <textarea x-model="whatsappMessageText" rows="8" class="w-full p-4 bg-emerald-50/40 border border-emerald-200 rounded-2xl text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 font-sans leading-relaxed"></textarea>
+                    <textarea x-model="whatsappMessageText" rows="10" class="w-full p-4 bg-emerald-50/40 border border-emerald-200 rounded-2xl text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 font-sans leading-relaxed"></textarea>
                 </div>
 
                 <!-- Botones de Acción -->
                 <div class="flex flex-col sm:flex-row gap-3">
-                    <button @click="copyWhatsAppMessage" class="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium py-3 px-4 rounded-xl text-xs transition flex items-center justify-center space-x-2">
-                        <i class="fa-solid fa-copy text-slate-500"></i>
-                        <span x-text="copiedFeedback ? '¡Copiado al Portapapeles!' : 'Copiar Texto'"></span>
-                    </button>
-                    <a :href="whatsappLink" target="_blank" @click="showWhatsappModal = false" class="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white font-medium py-3 px-4 rounded-xl text-xs shadow-sm transition flex items-center justify-center space-x-2">
+                    <a :href="whatsappLink" target="_blank" @click="showWhatsappModal = false" class="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-medium py-3 px-4 rounded-xl text-xs shadow-sm transition flex items-center justify-center space-x-2">
                         <i class="fa-brands fa-whatsapp text-base"></i>
                         <span>Enviar por WhatsApp</span>
                     </a>
@@ -627,42 +621,30 @@
 
     </div>
 
-    <!-- Firebase SDKs (Modular v13.2.0 con soporte para Emuladores) -->
+    <!-- Firebase SDKs (Modular v11) -->
     <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/13.2.0/firebase-app.js";
-        import { getAnalytics } from "https://www.gstatic.com/firebasejs/13.2.0/firebase-analytics.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, connectAuthEmulator } from "https://www.gstatic.com/firebasejs/13.2.0/firebase-auth.js";
-        import { getFirestore, collection, doc, setDoc, getDocs, addDoc, updateDoc, deleteDoc, onSnapshot, connectFirestoreEmulator } from "https://www.gstatic.com/firebasejs/13.2.0/firebase-firestore.js";
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, doc, setDoc, getDocs, addDoc, updateDoc, deleteDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // Configuración de Firebase provista
         const firebaseConfig = {
-            apiKey: "AIzaSyCol2IK-FBVILQO-lXHQyqcJh_K4XloO-g",
-            authDomain: "martin-adf14.firebaseapp.com",
-            projectId: "martin-adf14",
-            storageBucket: "martin-adf14.firebasestorage.app",
-            messagingSenderId: "442579097113",
-            appId: "1:442579097113:web:ca12f153e6f0772152fc88",
-            measurementId: "G-6J9NJDXNQK"
+            apiKey: "AIzaSyC-12zDd6LGzmR06WcZdJHInurevEQmhm0",
+            authDomain: "medido-1b7df.firebaseapp.com",
+            databaseURL: "https://medido-1b7df-default-rtdb.firebaseio.com",
+            projectId: "medido-1b7df",
+            storageBucket: "medido-1b7df.firebasestorage.app",
+            messagingSenderId: "1080178525205",
+            appId: "1:1080178525205:web:66e277c243d56826d83a1c",
+            measurementId: "G-QCY8VGVLDW"
         };
 
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'carniceria-santarita-default';
 
         // Inicializar Firebase
         const app = initializeApp(firebaseConfig);
-        const analytics = getAnalytics(app);
         const auth = getAuth(app);
         const db = getFirestore(app);
-
-        // Conexión automática a emuladores locales si se ejecuta en localhost
-        if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") {
-            try {
-                connectAuthEmulator(auth, "http://127.0.0.1:9099", { disableWarnings: true });
-                connectFirestoreEmulator(db, "127.0.0.1", 8080);
-                console.log("Conectado a los emuladores locales de Firebase.");
-            } catch (e) {
-                // Ya conectados previamente
-            }
-        }
 
         // Exponer globalmente para Alpine.js
         window.firebaseAppInstance = {
@@ -709,6 +691,7 @@
                 showEditClientModal: false,
                 showPaymentConfigModal: false,
                 copiedFeedback: false,
+                aliasCopiedFeedback: false,
                 toastMessage: '',
                 
                 activeClient: null,
@@ -744,11 +727,8 @@
                 movements: {},
                 systemUsers: [],
                 firebaseReady: false,
+                isConnected: false,
                 userId: null,
-
-                // Estados de conexión Firebase
-                firebaseConnected: false,
-                firebaseStatusText: 'Verificando conexión...',
 
                 init() {
                     // Cargar sesión guardada localmente
@@ -756,18 +736,6 @@
                     if (savedSession) {
                         this.currentUser = JSON.parse(savedSession);
                     }
-
-                    // Monitorear conectividad global de red (navigator.onLine)
-                    window.addEventListener('online', () => {
-                        if (this.firebaseReady) {
-                            this.firebaseConnected = true;
-                            this.firebaseStatusText = 'Firebase Conectado';
-                        }
-                    });
-                    window.addEventListener('offline', () => {
-                        this.firebaseConnected = false;
-                        this.firebaseStatusText = 'Sin conexión (Modo Local)';
-                    });
 
                     window.addEventListener('firebase-ready', async () => {
                         const { auth, signInAnonymously, signInWithCustomToken } = window.firebaseAppInstance;
@@ -782,25 +750,25 @@
                                 if (user) {
                                     this.userId = user.uid;
                                     this.firebaseReady = true;
-                                    this.firebaseConnected = true;
-                                    this.firebaseStatusText = 'Firebase Conectado';
+                                    this.isConnected = true;
                                     this.initFirestoreListeners();
                                 } else {
                                     this.userId = crypto.randomUUID();
                                     this.firebaseReady = true;
-                                    this.firebaseConnected = true;
-                                    this.firebaseStatusText = 'Firebase Conectado';
+                                    this.isConnected = true;
                                     this.initFirestoreListeners();
                                 }
                             });
                         } catch (e) {
                             console.error("Error en autenticación Firebase:", e);
+                            this.isConnected = false;
                             this.loadLocalFallback();
                         }
                     });
 
                     setTimeout(() => {
                         if (!this.firebaseReady) {
+                            this.isConnected = false;
                             this.loadLocalFallback();
                         }
                     }, 3000);
@@ -840,6 +808,7 @@
                 initFirestoreListeners() {
                     const { db, appId, collection, onSnapshot } = window.firebaseAppInstance;
                     if (!db) {
+                        this.isConnected = false;
                         this.loadLocalFallback();
                         return;
                     }
@@ -847,8 +816,7 @@
                     // Escuchar Configuración de Pago
                     const configRef = collection(db, 'artifacts', appId, 'public', 'data', 'payment_config');
                     onSnapshot(configRef, (snapshot) => {
-                        this.firebaseConnected = true;
-                        this.firebaseStatusText = 'Firebase Conectado';
+                        this.isConnected = true;
                         snapshot.forEach(docSnap => {
                             if (docSnap.data() && docSnap.data().alias) {
                                 this.paymentConfig = docSnap.data();
@@ -856,15 +824,13 @@
                         });
                     }, (err) => {
                         console.error("Error cargando configuración de pago:", err);
-                        this.firebaseConnected = false;
-                        this.firebaseStatusText = 'Error de conexión Firestore';
+                        this.isConnected = false;
                     });
 
                     // Escuchar Clientes
                     const clientsCol = collection(db, 'artifacts', appId, 'public', 'data', 'clients');
                     onSnapshot(clientsCol, (snapshot) => {
-                        this.firebaseConnected = true;
-                        this.firebaseStatusText = 'Firebase Conectado';
+                        this.isConnected = true;
                         let loadedClients = [];
                         snapshot.forEach(docSnap => {
                             loadedClients.push({ firestoreId: docSnap.id, ...docSnap.data() });
@@ -878,8 +844,7 @@
                         }
                     }, (error) => {
                         console.error("Error al escuchar clientes:", error);
-                        this.firebaseConnected = false;
-                        this.firebaseStatusText = 'Sin conexión (Modo Local)';
+                        this.isConnected = false;
                         this.loadLocalFallback();
                     });
 
@@ -961,9 +926,6 @@
                 },
 
                 loadLocalFallback() {
-                    this.firebaseConnected = false;
-                    this.firebaseStatusText = 'Modo Local (Sin conexión)';
-                    
                     const savedClients = localStorage.getItem('santarita_clients');
                     const savedMovements = localStorage.getItem('santarita_movements');
                     const savedUsers = localStorage.getItem('santarita_system_users');
@@ -1005,7 +967,7 @@
 
                 async savePaymentConfig() {
                     const { db, appId, doc, setDoc } = window.firebaseAppInstance;
-                    if (db && this.firebaseConnected) {
+                    if (db) {
                         try {
                             const configRef = doc(db, 'artifacts', appId, 'public', 'data', 'payment_config', 'settings');
                             await setDoc(configRef, this.paymentConfig);
@@ -1040,7 +1002,7 @@
                     if (!this.editingClient.name || !this.editingClient.phone) return;
                     
                     const { db, appId, doc, setDoc } = window.firebaseAppInstance;
-                    if (db && this.firebaseConnected) {
+                    if (db) {
                         try {
                             const clientRef = doc(db, 'artifacts', appId, 'public', 'data', 'clients', String(this.editingClient.id));
                             await setDoc(clientRef, this.editingClient, { merge: true });
@@ -1064,7 +1026,7 @@
                     if (!confirm('¿Estás seguro de eliminar este cliente y todos sus datos?')) return;
                     
                     const { db, appId, doc, deleteDoc } = window.firebaseAppInstance;
-                    if (db && this.firebaseConnected) {
+                    if (db) {
                         try {
                             const clientRef = doc(db, 'artifacts', appId, 'public', 'data', 'clients', String(id));
                             await deleteDoc(clientRef);
@@ -1096,7 +1058,7 @@
                     };
 
                     const { db, appId, doc, setDoc } = window.firebaseAppInstance;
-                    if (db && this.firebaseConnected) {
+                    if (db) {
                         try {
                             const uRef = doc(db, 'artifacts', appId, 'public', 'data', 'system_users', String(newId));
                             await setDoc(uRef, userObj);
@@ -1116,7 +1078,7 @@
 
                 async deleteSystemUser(id) {
                     const { db, appId, doc, deleteDoc } = window.firebaseAppInstance;
-                    if (db && this.firebaseConnected) {
+                    if (db) {
                         try {
                             const uRef = doc(db, 'artifacts', appId, 'public', 'data', 'system_users', String(id));
                             await deleteDoc(uRef);
@@ -1191,7 +1153,7 @@
                     };
 
                     const { db, appId, doc, setDoc } = window.firebaseAppInstance;
-                    if (db && this.firebaseConnected) {
+                    if (db) {
                         try {
                             const clientRef = doc(db, 'artifacts', appId, 'public', 'data', 'clients', String(newId));
                             await setDoc(clientRef, created);
@@ -1244,7 +1206,7 @@
                     };
 
                     const { db, appId, doc, setDoc } = window.firebaseAppInstance;
-                    if (db && this.firebaseConnected) {
+                    if (db) {
                         try {
                             const clientRef = doc(db, 'artifacts', appId, 'public', 'data', 'clients', String(this.activeClient.id));
                             await setDoc(clientRef, { ...this.activeClient, balance: newBalance }, { merge: true });
@@ -1279,6 +1241,7 @@
                     
                     this.updateWhatsappMessage();
                     this.copiedFeedback = false;
+                    this.aliasCopiedFeedback = false;
                     this.showWhatsappModal = true;
                 },
 
@@ -1313,25 +1276,10 @@
                         `📋 *Movimientos en el período:*\n${detailText}\n\n` +
                         `💰 *Saldo pendiente actual:* *${this.formatMoney(this.activeClient.balance)}*\n\n` +
                         `💳 *¿Deseas realizar la transferencia?*\n` +
-                        `Podés transferir al siguiente Alias:\n` +
-                        `🔹 *${this.paymentConfig.alias}*\n\n` +
-                        `📱 Y por favor envianos el comprobante de pago a este número de WhatsApp: *${this.paymentConfig.whatsappReceiptNumber}*.\n\n` +
+                        `Podés copiar y mantener presionado el siguiente Alias para transferir:\n` +
+                        `${this.paymentConfig.alias}\n\n` +
+                        `📱 Y por favor envianos el comprobante de pago a este número de WhatsApp: ${this.paymentConfig.whatsappReceiptNumber}.\n\n` +
                         `¡Muchas gracias por tu confianza! 🥩✨`;
-                },
-
-                copyWhatsAppMessage() {
-                    const textArea = document.createElement("textarea");
-                    textArea.value = this.whatsappMessageText;
-                    document.body.appendChild(textArea);
-                    textArea.select();
-                    try {
-                        document.execCommand('copy');
-                        this.copiedFeedback = true;
-                        setTimeout(() => this.copiedFeedback = false, 3000);
-                    } catch (err) {
-                        console.error('Error al copiar', err);
-                    }
-                    document.body.removeChild(textArea);
                 },
 
                 showToast(msg) {
